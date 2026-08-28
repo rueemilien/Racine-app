@@ -20,6 +20,7 @@ export const DesignColors = {
   onAccent: '#FFF9F2',
   progressTrack: '#F0E7D8',
   success: '#3F7A4E',
+  danger: '#B23B2E',
 };
 
 export const DesignFonts = {

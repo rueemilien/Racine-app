@@ -3,7 +3,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, LogBox, View } from 'react-native';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -13,6 +13,14 @@ import { supabase } from '@/src/services/supabase';
 export const unstable_settings = {
   anchor: '(tabs)',
 };
+
+// expo-notifications auto-subscribes to push token changes on import (its own
+// server-registration side effect) and warns that remote push isn't supported
+// in Expo Go — harmless here since we only use local scheduled notifications.
+LogBox.ignoreLogs([
+  'Android Push notifications (remote notifications)',
+  'Listening to push token changes',
+]);
 
 export default function RootLayout() {
   return (
@@ -80,8 +88,8 @@ function RootNavigator() {
         </Stack.Protected>
         <Stack.Protected guard={hasCompletedOnboarding}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="question-du-jour" options={{ headerShown: true, title: 'Question du jour' }} />
-          <Stack.Screen name="feedback" options={{ headerShown: true, title: 'Résultat' }} />
+          <Stack.Screen name="question-du-jour" options={{ headerShown: false }} />
+          <Stack.Screen name="feedback" options={{ headerShown: false }} />
         </Stack.Protected>
       </Stack>
       <StatusBar style="auto" />

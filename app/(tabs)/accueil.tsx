@@ -1,16 +1,19 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DesignColors, DesignFonts, inkAlpha } from '@/constants/design-system';
+import {
+  DailyQuestion,
+  getAnswerFor,
+  getCurrentUserId,
+  getTodayQuestion,
+  getUserStats,
+  UserStats,
+} from '@/src/services/daily';
 
 const BADGE_STEPS = [3, 7, 14, 30];
-
-// Mock data until the questions/answers backend lands (streak, score and
-// "answered today" will then come from Supabase instead of being hardcoded).
-const streak = 6;
-const score = 340;
-const answeredToday = false;
-const category = 'Histoire';
 
 function getBadgeProgress(currentStreak: number) {
   const nextStep = BADGE_STEPS.find((n) => n > currentStreak) ?? BADGE_STEPS[BADGE_STEPS.length - 1];
@@ -21,7 +24,52 @@ function getBadgeProgress(currentStreak: number) {
 
 export default function AccueilScreen() {
   const router = useRouter();
-  const { nextStep, progressPct } = getBadgeProgress(streak);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState<UserStats>({ streak: 0, score: 0 });
+  const [question, setQuestion] = useState<DailyQuestion | null>(null);
+  const [answeredToday, setAnsweredToday] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function load() {
+        const userId = await getCurrentUserId();
+        const [todayQuestion, userStats] = await Promise.all([
+          getTodayQuestion(),
+          userId ? getUserStats(userId) : Promise.resolve({ streak: 0, score: 0 }),
+        ]);
+        if (!isActive) return;
+
+        setQuestion(todayQuestion);
+        setStats(userStats);
+
+        if (userId && todayQuestion) {
+          const answer = await getAnswerFor(userId, todayQuestion.id);
+          if (isActive) setAnsweredToday(!!answer);
+        } else if (isActive) {
+          setAnsweredToday(false);
+        }
+
+        if (isActive) setIsLoading(false);
+      }
+
+      load();
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
+  const { nextStep, progressPct } = getBadgeProgress(stats.streak);
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator size="large" color={DesignColors.accent} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -33,11 +81,11 @@ export default function AccueilScreen() {
       <View style={styles.statsCard}>
         <View style={styles.statsRow}>
           <View>
-            <Text style={styles.streakValue}>{streak}</Text>
+            <Text style={styles.streakValue}>{stats.streak}</Text>
             <Text style={styles.streakLabel}>jours d&apos;affilée</Text>
           </View>
           <View style={styles.scoreBlock}>
-            <Text style={styles.scoreValue}>{score}</Text>
+            <Text style={styles.scoreValue}>{stats.score}</Text>
             <Text style={styles.scoreLabel}>points</Text>
           </View>
         </View>
@@ -45,7 +93,7 @@ export default function AccueilScreen() {
         <View style={styles.badgeSection}>
           <View style={styles.badgeRow}>
             {BADGE_STEPS.map((n) => {
-              const active = streak >= n;
+              const active = stats.streak >= n;
               return (
                 <View
                   key={n}
@@ -64,7 +112,12 @@ export default function AccueilScreen() {
         </View>
       </View>
 
-      {answeredToday ? (
+      {!question ? (
+        <View style={styles.answeredCard}>
+          <Text style={styles.answeredTitle}>Pas de question aujourd&apos;hui</Text>
+          <Text style={styles.answeredSubtitle}>Revenez demain</Text>
+        </View>
+      ) : answeredToday ? (
         <View style={styles.answeredCard}>
           <View>
             <Text style={styles.answeredTitle}>Question du jour</Text>
@@ -78,7 +131,7 @@ export default function AccueilScreen() {
           style={({ pressed }) => [styles.questionCard, pressed && styles.questionCardPressed]}>
           <View>
             <Text style={styles.questionTitle}>Question du jour</Text>
-            <Text style={styles.questionSubtitle}>{category} · pas encore répondu</Text>
+            <Text style={styles.questionSubtitle}>{question.category} · pas encore répondu</Text>
           </View>
           <Text style={styles.questionChevron}>›</Text>
         </Pressable>
@@ -103,9 +156,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: DesignColors.background,
     paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 28,
+    paddingTop: 52,
+    paddingBottom: 48,
     gap: 26,
+  },
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: DesignColors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   header: {
     gap: 4,

@@ -22,6 +22,15 @@ export async function getCachedNotificationTime(): Promise<NotificationTime | nu
   }
 }
 
+function toTimeColumn(time: NotificationTime): string {
+  return `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}:00`;
+}
+
+function fromTimeColumn(raw: string): NotificationTime {
+  const [hour, minute] = raw.split(':').map(Number);
+  return { hour, minute };
+}
+
 export async function saveNotificationTime(userId: string, time: NotificationTime) {
   // Cache first: scheduling must succeed even if the Supabase write below fails offline.
   await cacheNotificationTime(time);
@@ -29,8 +38,7 @@ export async function saveNotificationTime(userId: string, time: NotificationTim
   const { error } = await supabase.from('user_settings').upsert(
     {
       user_id: userId,
-      notification_hour: time.hour,
-      notification_minute: time.minute,
+      notification_time: toTimeColumn(time),
     },
     { onConflict: 'user_id' }
   );
@@ -43,18 +51,56 @@ export async function saveNotificationTime(userId: string, time: NotificationTim
 export async function getNotificationTime(userId: string): Promise<NotificationTime | null> {
   const { data, error } = await supabase
     .from('user_settings')
-    .select('notification_hour, notification_minute')
+    .select('notification_time')
     .eq('user_id', userId)
     .maybeSingle();
 
-  if (error || !data) {
+  if (error || !data?.notification_time) {
     if (error) {
       console.error('Failed to fetch notification time from Supabase, falling back to cache:', error.message);
     }
     return getCachedNotificationTime();
   }
 
-  const time = { hour: data.notification_hour, minute: data.notification_minute };
+  const time = fromTimeColumn(data.notification_time);
   await cacheNotificationTime(time);
   return time;
+}
+
+const RECAP_DAY_CACHE_KEY = 'iknow.recapDay';
+
+// `weekly_recap_day` (pre-existing column) stores the English day name
+// ('Monday'..'Sunday') — callers translate to/from the French UI labels.
+export async function getCachedRecapDay(): Promise<string | null> {
+  return AsyncStorage.getItem(RECAP_DAY_CACHE_KEY);
+}
+
+export async function saveRecapDay(userId: string, day: string) {
+  await AsyncStorage.setItem(RECAP_DAY_CACHE_KEY, day);
+
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert({ user_id: userId, weekly_recap_day: day }, { onConflict: 'user_id' });
+
+  if (error) {
+    console.error('Failed to sync recap day to Supabase (kept in local cache):', error.message);
+  }
+}
+
+export async function getRecapDay(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('weekly_recap_day')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error('Failed to fetch recap day from Supabase, falling back to cache:', error.message);
+    }
+    return getCachedRecapDay();
+  }
+
+  await AsyncStorage.setItem(RECAP_DAY_CACHE_KEY, data.weekly_recap_day);
+  return data.weekly_recap_day;
 }

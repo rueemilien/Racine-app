@@ -10,6 +10,10 @@ export function parseTimeLabel(label: string): { hour: number; minute: number } 
   return { hour: Number(hourPart), minute: Number(minutePart) || 0 };
 }
 
+export function formatTimeLabel(time: { hour: number; minute: number }): string {
+  return `${time.hour}h${String(time.minute).padStart(2, '0')}`;
+}
+
 async function ensureAndroidChannel() {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
