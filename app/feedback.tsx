@@ -50,8 +50,9 @@ export default function FeedbackScreen() {
         )}
 
         <View style={styles.explanationCard}>
-          <Text style={styles.explanationText}>{question.explanation}</Text>
-          <Text style={styles.sourceText}>{question.source}</Text>
+          <Text style={styles.wordText}>{question.options[question.correctIndex]}</Text>
+          <Text style={styles.definitionText}>{question.text}</Text>
+          <Text style={styles.exampleText}>Exemple : {question.explanation}</Text>
         </View>
       </View>
 
@@ -102,12 +103,17 @@ const styles = StyleSheet.create({
     boxShadow: [{ offsetX: 0, offsetY: 8, blurRadius: 24, color: inkAlpha(0.08) }],
     elevation: 3,
   },
-  explanationText: {
+  wordText: {
+    fontFamily: DesignFonts.bold,
+    fontSize: 20,
+    color: DesignColors.ink,
+  },
+  definitionText: {
     fontSize: 15,
     lineHeight: 24,
     color: DesignColors.ink,
   },
-  sourceText: {
+  exampleText: {
     fontSize: 13,
     lineHeight: 19,
     color: inkAlpha(0.5),

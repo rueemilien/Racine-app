@@ -1,6 +1,7 @@
 import { Sora_500Medium, Sora_600SemiBold, Sora_700Bold, useFonts } from '@expo-google-fonts/sora';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, LogBox, View } from 'react-native';
@@ -8,6 +9,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { OnboardingProvider, useOnboarding } from '@/hooks/use-onboarding';
+import { WEEKLY_RECAP_ID } from '@/src/services/notifications';
 import { supabase } from '@/src/services/supabase';
 
 export const unstable_settings = {
@@ -31,6 +33,7 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -71,6 +74,25 @@ function RootNavigator() {
 
     ensureAnonymousSession();
   }, []);
+
+  // Tapping the weekly recap notification should land on Historique (its
+  // content already summarizes the week; no dedicated recap screen). Only
+  // act once onboarding is done — the recap is never scheduled before then.
+  useEffect(() => {
+    if (!hasCompletedOnboarding) return;
+
+    function handleResponse(response: Notifications.NotificationResponse) {
+      if (response.notification.request.identifier === WEEKLY_RECAP_ID) {
+        router.push('/historique');
+      }
+    }
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) handleResponse(response);
+    });
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+    return () => subscription.remove();
+  }, [hasCompletedOnboarding, router]);
 
   if (!isAuthReady || isOnboardingLoading || !fontsLoaded) {
     return (

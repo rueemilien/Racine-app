@@ -4,19 +4,32 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DesignColors, DesignFonts, inkAlpha } from '@/constants/design-system';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import { formatTimeLabel, parseTimeLabel, scheduleDailyReminder } from '@/src/services/notifications';
+import { formatWeeklyRecapSummary, getWeeklyRecapStats } from '@/src/services/daily';
+import { formatTimeLabel, parseTimeLabel, scheduleDailyReminder, scheduleWeeklyRecap } from '@/src/services/notifications';
 import { supabase } from '@/src/services/supabase';
 import {
   getCachedNotificationTime,
   getCachedRecapDay,
   getNotificationTime,
   getRecapDay,
+  NotificationTime,
   saveNotificationTime,
   saveRecapDay,
 } from '@/src/services/user-settings';
 
 const TIME_OPTIONS = ['8h00', '12h00', '18h00', '20h00'];
 const DAY_OPTIONS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+// expo-notifications' WEEKLY trigger numbers weekdays 1-7 with 1 = Sunday.
+const EXPO_WEEKDAY_BY_FRENCH: Record<string, number> = {
+  Dimanche: 1,
+  Lundi: 2,
+  Mardi: 3,
+  Mercredi: 4,
+  Jeudi: 5,
+  Vendredi: 6,
+  Samedi: 7,
+};
 
 // `user_settings.weekly_recap_day` stores the English day name — the UI
 // stays in French, so translate at the edges rather than in the service.
@@ -46,6 +59,15 @@ export default function ReglagesScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState('8h00');
   const [recapDay, setRecapDay] = useState('Dimanche');
+  // Only reschedule the weekly recap once the user has actually opted in by
+  // picking a day (either just now, or previously — reflected in the DB) —
+  // `recapDay`'s "Dimanche" default alone shouldn't trigger a schedule.
+  const [hasRecapDaySet, setHasRecapDaySet] = useState(false);
+
+  async function rescheduleWeeklyRecap(uid: string, frenchDay: string, time: NotificationTime) {
+    const stats = await getWeeklyRecapStats(uid);
+    await scheduleWeeklyRecap(EXPO_WEEKDAY_BY_FRENCH[frenchDay], time.hour, time.minute, formatWeeklyRecapSummary(stats));
+  }
 
   useEffect(() => {
     let isActive = true;
@@ -64,7 +86,12 @@ export default function ReglagesScreen() {
       ]);
       if (!isActive) return;
       if (time) setSelectedTime(formatTimeLabel(time));
-      if (day) setRecapDay(FRENCH_DAY_BY_ENGLISH[capitalize(day)] ?? day);
+      if (day) {
+        const frenchDay = FRENCH_DAY_BY_ENGLISH[capitalize(day)] ?? day;
+        setRecapDay(frenchDay);
+        setHasRecapDaySet(true);
+        if (uid) await rescheduleWeeklyRecap(uid, frenchDay, time ?? parseTimeLabel('8h00'));
+      }
     }
 
     loadSettings();
@@ -80,12 +107,17 @@ export default function ReglagesScreen() {
       await saveNotificationTime(userId, time);
     }
     await scheduleDailyReminder(time.hour, time.minute);
+    if (userId && hasRecapDaySet) {
+      await rescheduleWeeklyRecap(userId, recapDay, time);
+    }
   }
 
   async function handleSelectRecapDay(day: string) {
     setRecapDay(day);
+    setHasRecapDaySet(true);
     if (userId) {
       await saveRecapDay(userId, ENGLISH_DAY_BY_FRENCH[day]);
+      await rescheduleWeeklyRecap(userId, day, parseTimeLabel(selectedTime));
     }
   }
 

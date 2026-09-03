@@ -28,3 +28,18 @@ export const DesignFonts = {
   semiBold: 'Sora_600SemiBold',
   medium: 'Sora_500Medium',
 };
+
+// Light → dark ramp so the category badge doubles as a difficulty indicator,
+// from "Débutant" (lightest) to "Érudit" (darkest) — keyed on the exact
+// `categories.name` values seeded for Racine's 5 vocabulary tiers.
+const DIFFICULTY_BADGE_COLORS: Record<string, { background: string; text: string }> = {
+  'Débutant': { background: '#EDE0C8', text: DesignColors.ink },
+  'Intermédiaire': { background: '#E3B98A', text: DesignColors.ink },
+  'Avancé': { background: DesignColors.accent, text: DesignColors.onAccent },
+  'Expert': { background: '#8C3A22', text: DesignColors.onAccent },
+  'Érudit': { background: DesignColors.ink, text: DesignColors.onAccent },
+};
+
+export function getDifficultyBadgeColors(categoryName: string): { background: string; text: string } {
+  return DIFFICULTY_BADGE_COLORS[categoryName] ?? { background: DesignColors.accent, text: DesignColors.onAccent };
+}

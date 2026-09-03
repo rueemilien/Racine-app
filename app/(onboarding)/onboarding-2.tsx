@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DesignColors, DesignFonts, inkAlpha } from '@/constants/design-system';
 
@@ -39,14 +39,14 @@ export default function OnboardingTwoScreen() {
         </View>
 
         <View style={styles.notifCard}>
-          <View style={styles.notifIcon} />
+          <Image source={require('@/assets/images/icon.png')} style={styles.notifIcon} />
           <View style={styles.notifBody}>
             <View style={styles.notifHeaderRow}>
-              <Text style={styles.notifApp}>iKnow</Text>
+              <Text style={styles.notifApp}>Racine</Text>
               <Text style={styles.notifTime}>maintenant</Text>
             </View>
             <Text style={styles.notifText}>
-              Votre question du jour est prête. Une minute pour la tenter ?
+              Votre mot du jour est prêt. Une minute pour le deviner ?
             </Text>
           </View>
         </View>
@@ -70,7 +70,7 @@ export default function OnboardingTwoScreen() {
         <View style={styles.overlay}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>
-              « iKnow » souhaite vous envoyer des notifications
+              « Racine » souhaite vous envoyer des notifications
             </Text>
             <Text style={styles.dialogBody}>
               Les notifications peuvent inclure des alertes, sons et badges. Réglable à tout
@@ -135,7 +135,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: DesignColors.accent,
   },
   notifBody: {
     flex: 1,

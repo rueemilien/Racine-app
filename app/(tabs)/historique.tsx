@@ -4,12 +4,20 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DesignColors, DesignFonts, inkAlpha } from '@/constants/design-system';
-import { getAnswerHistory, getCurrentUserId, HistoryEntry } from '@/src/services/daily';
+import {
+  formatWeeklyRecapSummary,
+  getAnswerHistory,
+  getCurrentUserId,
+  getWeeklyRecapStats,
+  HistoryEntry,
+  WeeklyRecapStats,
+} from '@/src/services/daily';
 
 export default function HistoriqueScreen() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [weeklyStats, setWeeklyStats] = useState<WeeklyRecapStats | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -17,9 +25,12 @@ export default function HistoriqueScreen() {
 
       async function load() {
         const userId = await getCurrentUserId();
-        const entries = userId ? await getAnswerHistory(userId) : [];
+        const [entries, stats] = userId
+          ? await Promise.all([getAnswerHistory(userId), getWeeklyRecapStats(userId)])
+          : [[], null];
         if (isActive) {
           setHistory(entries);
+          setWeeklyStats(stats);
           setIsLoading(false);
         }
       }
@@ -40,22 +51,29 @@ export default function HistoriqueScreen() {
         <Text style={styles.title}>Historique</Text>
       </View>
 
+      {weeklyStats && weeklyStats.totalAnswered > 0 && (
+        <View style={styles.recapBanner}>
+          <Text style={styles.recapText}>{formatWeeklyRecapSummary(weeklyStats)}</Text>
+        </View>
+      )}
+
       {isLoading ? (
         <ActivityIndicator size="large" color={DesignColors.accent} />
       ) : history.length === 0 ? (
-        <Text style={styles.emptyText}>Pas encore de réponse — répondez à la question du jour pour commencer.</Text>
+        <Text style={styles.emptyText}>Pas encore de réponse — répondez au mot du jour pour commencer.</Text>
       ) : (
         <View style={styles.list}>
           {history.map((entry, index) => (
             <View key={`${entry.date}-${index}`} style={styles.row}>
               <View style={styles.rowBody}>
-                <View style={styles.rowMeta}>
+                <View style={styles.rowHeader}>
+                  <Text style={styles.word}>{entry.word}</Text>
                   <Text style={styles.category}>{entry.category}</Text>
-                  <Text style={styles.date}>{entry.date}</Text>
                 </View>
                 <Text style={styles.snippet} numberOfLines={1}>
                   {entry.snippet}
                 </Text>
+                <Text style={styles.date}>{entry.date}</Text>
               </View>
               <Text style={[styles.mark, { color: entry.correct ? DesignColors.success : DesignColors.danger }]}>
                 {entry.correct ? '✓' : '✕'}
@@ -97,6 +115,17 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: inkAlpha(0.5),
   },
+  recapBanner: {
+    backgroundColor: DesignColors.surfaceAlt,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  recapText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: DesignColors.ink,
+  },
   list: {
     gap: 10,
   },
@@ -115,25 +144,32 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: 2,
   },
-  rowMeta: {
+  rowHeader: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    justifyContent: 'space-between',
     gap: 8,
   },
   category: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
-    color: DesignColors.accent,
+    color: inkAlpha(0.35),
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   date: {
     fontSize: 11,
     color: inkAlpha(0.4),
+    marginTop: 2,
   },
   snippet: {
     fontSize: 13,
     lineHeight: 18,
+    color: DesignColors.ink,
+  },
+  word: {
+    fontFamily: DesignFonts.semiBold,
+    fontSize: 15,
     color: DesignColors.ink,
   },
   mark: {

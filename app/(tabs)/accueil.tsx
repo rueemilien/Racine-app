@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { DesignColors, DesignFonts, inkAlpha } from '@/constants/design-system';
 import {
   DailyQuestion,
-  getAnswerFor,
+  getAnswerForToday,
   getCurrentUserId,
   getTodayQuestion,
   getUserStats,
@@ -45,7 +45,7 @@ export default function AccueilScreen() {
         setStats(userStats);
 
         if (userId && todayQuestion) {
-          const answer = await getAnswerFor(userId, todayQuestion.id);
+          const answer = await getAnswerForToday(userId);
           if (isActive) setAnsweredToday(!!answer);
         } else if (isActive) {
           setAnsweredToday(false);
@@ -75,7 +75,7 @@ export default function AccueilScreen() {
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.greeting}>Bonjour !</Text>
-        <Text style={styles.appName}>iKnow</Text>
+        <Text style={styles.appName}>Racine</Text>
       </View>
 
       <View style={styles.statsCard}>
@@ -120,7 +120,7 @@ export default function AccueilScreen() {
       ) : answeredToday ? (
         <View style={styles.answeredCard}>
           <View>
-            <Text style={styles.answeredTitle}>Question du jour</Text>
+            <Text style={styles.answeredTitle}>Mot du jour</Text>
             <Text style={styles.answeredSubtitle}>Répondu — revenez demain</Text>
           </View>
           <Text style={styles.answeredCheck}>✓</Text>
@@ -129,8 +129,9 @@ export default function AccueilScreen() {
         <Pressable
           onPress={() => router.push('/question-du-jour')}
           style={({ pressed }) => [styles.questionCard, pressed && styles.questionCardPressed]}>
+          <View style={styles.questionBadge} />
           <View>
-            <Text style={styles.questionTitle}>Question du jour</Text>
+            <Text style={styles.questionTitle}>Mot du jour</Text>
             <Text style={styles.questionSubtitle}>{question.category} · pas encore répondu</Text>
           </View>
           <Text style={styles.questionChevron}>›</Text>
@@ -280,6 +281,17 @@ const styles = StyleSheet.create({
   },
   questionCardPressed: {
     backgroundColor: '#3A2F24',
+  },
+  questionBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: DesignColors.danger,
+    borderWidth: 2,
+    borderColor: DesignColors.background,
   },
   questionTitle: {
     fontFamily: DesignFonts.semiBold,

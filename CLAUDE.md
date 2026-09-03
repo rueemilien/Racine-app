@@ -1,4 +1,4 @@
-# iKnow - App de culture générale
+# Racine - App de vocabulaire
 
 ## Stack
 - React Native + Expo (managed workflow)
@@ -6,7 +6,7 @@
 - expo-notifications
 
 ## Objectif
-App qui délivre 1 question de culture générale par jour via notification, avec QCM 4 réponses, feedback + explication, historique, streak, récap hebdomadaire.
+App qui délivre 1 question de vocabulaire par jour via notification (une définition, 4 mots au choix), feedback + explication, historique, streak, récap hebdomadaire.
 
 ## Commandes
 - Lancer l'app : npx expo start

@@ -11,16 +11,17 @@ export default function OnboardingOneScreen() {
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <View style={styles.content}>
         <View style={styles.illustration}>
-          <View style={styles.illustrationCircle} />
-          <View style={styles.illustrationSquare} />
-          <View style={styles.illustrationDot} />
+          <View style={styles.logoStem} />
+          <View style={[styles.logoBranch, styles.logoBranchLeft]} />
+          <View style={styles.logoBranch} />
+          <View style={[styles.logoBranch, styles.logoBranchRight]} />
         </View>
 
         <View style={styles.copy}>
-          <Text style={styles.title}>1 question,{'\n'}1 minute,{'\n'}chaque jour.</Text>
+          <Text style={styles.title}>1 mot,{'\n'}1 minute,{'\n'}chaque jour.</Text>
           <Text style={styles.paragraph}>
-            iKnow vous glisse une question de culture générale par jour — de quoi apprendre un
-            truc nouveau, sans y passer votre temps.
+            Racine vous glisse un mot de vocabulaire par jour — devinez-le à partir de sa
+            définition, et enrichissez votre vocabulaire sans y passer votre temps.
           </Text>
         </View>
       </View>
@@ -58,36 +59,34 @@ const styles = StyleSheet.create({
   },
   illustration: {
     width: 200,
-    height: 170,
+    height: 190,
   },
-  illustrationCircle: {
+  // The Racine mark: one straight stem on top, three straight strokes
+  // fanning out at the bottom — mirrors assets/images/icon.png.
+  logoStem: {
     position: 'absolute',
-    left: 14,
-    top: 0,
-    width: 148,
-    height: 148,
-    borderRadius: 74,
+    left: 92,
+    top: 20,
+    width: 16,
+    height: 70,
+    borderRadius: 8,
     backgroundColor: DesignColors.accent,
   },
-  illustrationSquare: {
+  logoBranch: {
     position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 104,
-    height: 104,
-    borderRadius: 26,
-    backgroundColor: DesignColors.cream,
-    borderWidth: 2,
-    borderColor: DesignColors.ink,
+    left: 92,
+    top: 90,
+    width: 16,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: DesignColors.accent,
+    transformOrigin: 'top',
   },
-  illustrationDot: {
-    position: 'absolute',
-    left: 76,
-    top: 56,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: DesignColors.ink,
+  logoBranchLeft: {
+    transform: [{ rotate: '-34deg' }],
+  },
+  logoBranchRight: {
+    transform: [{ rotate: '34deg' }],
   },
   copy: {
     alignItems: 'center',

@@ -1,6 +1,6 @@
-# iKnow — Culture générale au quotidien
+# Racine — Le vocabulaire au quotidien
 
-Application mobile qui délivre une question de culture générale par jour via notification, avec QCM (4 réponses), feedback immédiat, explication détaillée, historique et récap hebdomadaire.
+Application mobile qui délivre une question de vocabulaire par jour via notification (une définition, 4 mots au choix), feedback immédiat, explication détaillée, historique et récap hebdomadaire.
 
 ## Stack
 

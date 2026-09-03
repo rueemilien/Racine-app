@@ -2,8 +2,8 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { DesignColors, DesignFonts, inkAlpha } from '@/constants/design-system';
-import { DailyQuestion, getAnswerFor, getCurrentUserId, getTodayQuestion, getUserStats, submitAnswer } from '@/src/services/daily';
+import { DesignColors, DesignFonts, getDifficultyBadgeColors, inkAlpha } from '@/constants/design-system';
+import { DailyQuestion, getAnswerForToday, getCurrentUserId, getTodayQuestion, getUserStats, submitAnswer } from '@/src/services/daily';
 
 const LETTERS = ['A', 'B', 'C', 'D'];
 // Mirrors the design's two-step reveal: highlight the pick, then show
@@ -33,14 +33,14 @@ export default function QuestionDuJourScreen() {
       if (stats) setStreak(stats.streak);
 
       // Already answered today (e.g. back-navigated here): don't let the
-      // unique (user_id, question_id) constraint reject a second insert —
+      // unique (user_id, answered_date) constraint reject a second insert —
       // send them straight to the result instead.
-      if (uid && todayQuestion) {
-        const existing = await getAnswerFor(uid, todayQuestion.id);
+      if (uid) {
+        const existing = await getAnswerForToday(uid);
         if (isActive && existing) {
           router.replace({
             pathname: '/feedback',
-            params: { questionId: todayQuestion.id, selected: String(existing.selectedIndex) },
+            params: { questionId: existing.questionId, selected: String(existing.selectedIndex) },
           });
           return;
         }
@@ -83,7 +83,7 @@ export default function QuestionDuJourScreen() {
             <Text style={styles.backChevron}>‹</Text>
           </Pressable>
         </View>
-        <Text style={styles.emptyText}>Pas de question disponible aujourd&apos;hui. Revenez demain !</Text>
+        <Text style={styles.emptyText}>Pas de mot disponible aujourd&apos;hui. Revenez demain !</Text>
       </View>
     );
   }
@@ -94,8 +94,10 @@ export default function QuestionDuJourScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.backChevron}>‹</Text>
         </Pressable>
-        <View style={styles.categoryPill}>
-          <Text style={styles.categoryPillText}>{question.category}</Text>
+        <View style={[styles.categoryPill, { backgroundColor: getDifficultyBadgeColors(question.category).background }]}>
+          <Text style={[styles.categoryPillText, { color: getDifficultyBadgeColors(question.category).text }]}>
+            {question.category}
+          </Text>
         </View>
         <Text style={styles.streakLabel}>{streak} j.</Text>
       </View>
@@ -179,7 +181,6 @@ const styles = StyleSheet.create({
     color: DesignColors.ink,
   },
   categoryPill: {
-    backgroundColor: DesignColors.accent,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -187,7 +188,6 @@ const styles = StyleSheet.create({
   categoryPillText: {
     fontSize: 12,
     fontWeight: '600',
-    color: DesignColors.onAccent,
   },
   streakLabel: {
     fontSize: 12,
