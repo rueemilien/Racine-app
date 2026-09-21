@@ -14,7 +14,9 @@ import {
 } from '@/src/services/daily';
 import { getPreferredCategoryIds } from '@/src/services/user-settings';
 
-const BADGE_STEPS = [3, 7, 14, 30];
+// Mirrors STREAK_MILESTONE_BONUSES in src/services/daily.ts — same thresholds
+// that earn a points bonus, so the badge row shows exactly what's coming.
+const BADGE_STEPS = [7, 30, 180, 365];
 
 function getBadgeProgress(currentStreak: number) {
   const nextStep = BADGE_STEPS.find((n) => n > currentStreak) ?? BADGE_STEPS[BADGE_STEPS.length - 1];

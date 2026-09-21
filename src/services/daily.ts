@@ -210,10 +210,10 @@ export async function resetExpiredStreak(userId: string): Promise<void> {
 // the only source of truth, so a milestone re-fires every time the streak
 // climbs back up to it after a reset.
 const STREAK_MILESTONE_BONUSES: Record<number, number> = {
-  7: 50,
-  30: 200,
-  180: 750,
-  365: 2000,
+  7: 20,
+  30: 100,
+  180: 300,
+  365: 1000,
 };
 
 async function updateUserStatsAfterAnswer(userId: string, pointsEarned: number) {
