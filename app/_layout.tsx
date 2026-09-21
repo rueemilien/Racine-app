@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { OnboardingProvider, useOnboarding } from '@/hooks/use-onboarding';
+import { resetExpiredStreak } from '@/src/services/daily';
 import { WEEKLY_RECAP_ID } from '@/src/services/notifications';
 import { supabase } from '@/src/services/supabase';
 
@@ -67,6 +68,11 @@ function RootNavigator() {
         if (error) {
           console.error('Profile upsert failed:', error.message);
         }
+
+        // A missed day only naturally resets the streak the next time the
+        // user answers — do it here too so the UI doesn't show a stale
+        // streak on a cold start after 2+ missed days.
+        await resetExpiredStreak(userId);
       }
 
       setIsAuthReady(true);
@@ -105,6 +111,7 @@ function RootNavigator() {
   return (
     <ThemeProvider value={theme}>
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
         <Stack.Protected guard={!hasCompletedOnboarding}>
           <Stack.Screen name="(onboarding)" />
         </Stack.Protected>

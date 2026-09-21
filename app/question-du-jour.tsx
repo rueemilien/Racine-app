@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { DesignColors, DesignFonts, getDifficultyBadgeColors, inkAlpha } from '@/constants/design-system';
 import { DailyQuestion, getAnswerForToday, getCurrentUserId, getTodayQuestion, getUserStats, submitAnswer } from '@/src/services/daily';
+import { getPreferredCategoryIds } from '@/src/services/user-settings';
 
 const LETTERS = ['A', 'B', 'C', 'D'];
 // Mirrors the design's two-step reveal: highlight the pick, then show
@@ -25,7 +26,8 @@ export default function QuestionDuJourScreen() {
 
     async function load() {
       const uid = await getCurrentUserId();
-      const [todayQuestion, stats] = await Promise.all([getTodayQuestion(), uid ? getUserStats(uid) : null]);
+      const categoryIds = uid ? await getPreferredCategoryIds(uid) : [];
+      const [todayQuestion, stats] = await Promise.all([getTodayQuestion(categoryIds), uid ? getUserStats(uid) : null]);
       if (!isActive) return;
 
       setUserId(uid);
@@ -61,7 +63,7 @@ export default function QuestionDuJourScreen() {
     setTimeout(() => {
       setRevealed(true);
       setTimeout(async () => {
-        await submitAnswer(userId, question.id, index, index === question.correctIndex);
+        await submitAnswer(userId, question.id, index, index === question.correctIndex, question.pointsValue);
         router.push({ pathname: '/feedback', params: { questionId: question.id, selected: String(index) } });
       }, NAVIGATE_DELAY_MS);
     }, REVEAL_DELAY_MS);

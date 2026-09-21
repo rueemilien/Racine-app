@@ -4,16 +4,18 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DesignColors, DesignFonts, inkAlpha } from '@/constants/design-system';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import { formatWeeklyRecapSummary, getWeeklyRecapStats } from '@/src/services/daily';
+import { Category, formatWeeklyRecapSummary, getCategories, getWeeklyRecapStats } from '@/src/services/daily';
 import { formatTimeLabel, parseTimeLabel, scheduleDailyReminder, scheduleWeeklyRecap } from '@/src/services/notifications';
 import { supabase } from '@/src/services/supabase';
 import {
   getCachedNotificationTime,
   getCachedRecapDay,
   getNotificationTime,
+  getPreferredCategoryIds,
   getRecapDay,
   NotificationTime,
   saveNotificationTime,
+  savePreferredCategoryIds,
   saveRecapDay,
 } from '@/src/services/user-settings';
 
@@ -59,6 +61,8 @@ export default function ReglagesScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState('8h00');
   const [recapDay, setRecapDay] = useState('Dimanche');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   // Only reschedule the weekly recap once the user has actually opted in by
   // picking a day (either just now, or previously — reflected in the DB) —
   // `recapDay`'s "Dimanche" default alone shouldn't trigger a schedule.
@@ -80,9 +84,11 @@ export default function ReglagesScreen() {
       if (!isActive) return;
       setUserId(uid);
 
-      const [time, day] = await Promise.all([
+      const [time, day, cats, preferredCategoryIds] = await Promise.all([
         uid ? getNotificationTime(uid) : getCachedNotificationTime(),
         uid ? getRecapDay(uid) : getCachedRecapDay(),
+        getCategories(),
+        uid ? getPreferredCategoryIds(uid) : Promise.resolve<number[]>([]),
       ]);
       if (!isActive) return;
       if (time) setSelectedTime(formatTimeLabel(time));
@@ -92,6 +98,9 @@ export default function ReglagesScreen() {
         setHasRecapDaySet(true);
         if (uid) await rescheduleWeeklyRecap(uid, frenchDay, time ?? parseTimeLabel('8h00'));
       }
+      setCategories(cats);
+      // Empty means "no preference set yet" — default to all categories selected.
+      setSelectedCategoryIds(preferredCategoryIds.length > 0 ? preferredCategoryIds : cats.map((c) => c.id));
     }
 
     loadSettings();
@@ -118,6 +127,21 @@ export default function ReglagesScreen() {
     if (userId) {
       await saveRecapDay(userId, ENGLISH_DAY_BY_FRENCH[day]);
       await rescheduleWeeklyRecap(userId, day, parseTimeLabel(selectedTime));
+    }
+  }
+
+  function handleToggleCategory(categoryId: number) {
+    const isSelected = selectedCategoryIds.includes(categoryId);
+    // Keep at least one category selected — an empty selection would fall
+    // back to "all categories" instead of the user's intended narrowing.
+    if (isSelected && selectedCategoryIds.length === 1) return;
+
+    const next = isSelected
+      ? selectedCategoryIds.filter((id) => id !== categoryId)
+      : [...selectedCategoryIds, categoryId];
+    setSelectedCategoryIds(next);
+    if (userId) {
+      savePreferredCategoryIds(userId, next);
     }
   }
 
@@ -163,6 +187,23 @@ export default function ReglagesScreen() {
                 onPress={() => handleSelectRecapDay(day)}
                 style={[styles.dayChip, isSelected ? styles.chipSelected : styles.chipUnselected]}>
                 <Text style={[styles.dayChipText, isSelected && styles.chipTextSelected]}>{day[0]}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Catégories</Text>
+        <View style={styles.chipsRow}>
+          {categories.map((category) => {
+            const isSelected = selectedCategoryIds.includes(category.id);
+            return (
+              <Pressable
+                key={category.id}
+                onPress={() => handleToggleCategory(category.id)}
+                style={[styles.chip, isSelected ? styles.chipSelected : styles.chipUnselected]}>
+                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{category.name}</Text>
               </Pressable>
             );
           })}

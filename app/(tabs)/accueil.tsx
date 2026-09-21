@@ -12,6 +12,7 @@ import {
   getUserStats,
   UserStats,
 } from '@/src/services/daily';
+import { getPreferredCategoryIds } from '@/src/services/user-settings';
 
 const BADGE_STEPS = [3, 7, 14, 30];
 
@@ -25,7 +26,7 @@ function getBadgeProgress(currentStreak: number) {
 export default function AccueilScreen() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState<UserStats>({ streak: 0, score: 0 });
+  const [stats, setStats] = useState<UserStats>({ streak: 0, longestStreak: 0, score: 0 });
   const [question, setQuestion] = useState<DailyQuestion | null>(null);
   const [answeredToday, setAnsweredToday] = useState(false);
 
@@ -35,9 +36,10 @@ export default function AccueilScreen() {
 
       async function load() {
         const userId = await getCurrentUserId();
+        const categoryIds = userId ? await getPreferredCategoryIds(userId) : [];
         const [todayQuestion, userStats] = await Promise.all([
-          getTodayQuestion(),
-          userId ? getUserStats(userId) : Promise.resolve({ streak: 0, score: 0 }),
+          getTodayQuestion(categoryIds),
+          userId ? getUserStats(userId) : Promise.resolve({ streak: 0, longestStreak: 0, score: 0 }),
         ]);
         if (!isActive) return;
 
@@ -83,6 +85,7 @@ export default function AccueilScreen() {
           <View>
             <Text style={styles.streakValue}>{stats.streak}</Text>
             <Text style={styles.streakLabel}>jours d&apos;affilée</Text>
+            <Text style={styles.recordLabel}>Record : {stats.longestStreak} j.</Text>
           </View>
           <View style={styles.scoreBlock}>
             <Text style={styles.scoreValue}>{stats.score}</Text>
@@ -201,6 +204,11 @@ const styles = StyleSheet.create({
   streakLabel: {
     fontSize: 13,
     color: inkAlpha(0.55),
+  },
+  recordLabel: {
+    fontSize: 12,
+    color: inkAlpha(0.4),
+    marginTop: 2,
   },
   scoreBlock: {
     alignItems: 'flex-end',

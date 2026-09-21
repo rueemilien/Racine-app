@@ -1,5 +1,10 @@
 import { supabase } from './supabase';
 
+export type Category = {
+  id: number;
+  name: string;
+};
+
 export type DailyQuestion = {
   id: string;
   category: string;
@@ -8,10 +13,12 @@ export type DailyQuestion = {
   correctIndex: number;
   explanation: string;
   source: string;
+  pointsValue: number;
 };
 
 export type UserStats = {
   streak: number;
+  longestStreak: number;
   score: number;
 };
 
@@ -30,7 +37,9 @@ export type WeeklyRecapStats = {
 };
 
 const CHOICE_LETTERS = ['a', 'b', 'c', 'd'];
-const POINTS_PER_CORRECT_ANSWER = 10;
+// Fallback only — every question has its own `points_value` (10/20/30 by
+// difficulty), this just covers a row where the column was never set.
+const DEFAULT_POINTS_VALUE = 10;
 
 function letterToIndex(letter: string): number {
   return CHOICE_LETTERS.indexOf((letter ?? '').toLowerCase());
@@ -70,7 +79,7 @@ function dayIndexForDate(date: Date, count: number): number {
 }
 
 const QUESTION_COLUMNS =
-  'id, question_text, choice_a, choice_b, choice_c, choice_d, correct_choice, explanation, source, created_at, categories ( name )';
+  'id, question_text, choice_a, choice_b, choice_c, choice_d, correct_choice, explanation, source, points_value, created_at, categories ( name )';
 
 function mapQuestionRow(row: any): DailyQuestion {
   return {
@@ -81,6 +90,7 @@ function mapQuestionRow(row: any): DailyQuestion {
     correctIndex: letterToIndex(row.correct_choice),
     explanation: row.explanation,
     source: row.source ?? '',
+    pointsValue: row.points_value ?? DEFAULT_POINTS_VALUE,
   };
 }
 
@@ -91,12 +101,30 @@ export async function getCurrentUserId(): Promise<string | null> {
   return session?.user.id ?? null;
 }
 
-export async function getTodayQuestion(): Promise<DailyQuestion | null> {
-  const { data, error } = await supabase
+export async function getCategories(): Promise<Category[]> {
+  const { data, error } = await supabase.from('categories').select('id, name').order('id', { ascending: true });
+
+  if (error || !data) {
+    if (error) console.error('Failed to fetch categories:', error.message);
+    return [];
+  }
+  return data;
+}
+
+// `categoryIds` empty or omitted means "no preference" — pull from the full
+// question bank rather than filtering to nothing.
+export async function getTodayQuestion(categoryIds?: number[]): Promise<DailyQuestion | null> {
+  let query = supabase
     .from('questions')
     .select(QUESTION_COLUMNS)
     .order('created_at', { ascending: true })
     .order('id', { ascending: true });
+
+  if (categoryIds && categoryIds.length > 0) {
+    query = query.in('category_id', categoryIds);
+  }
+
+  const { data, error } = await query;
 
   if (error || !data || data.length === 0) {
     if (error) console.error('Failed to fetch the daily question:', error.message);
@@ -143,6 +171,51 @@ export async function getAnswerForToday(
   return data ? { questionId: data.question_id, selectedIndex: letterToIndex(data.selected_choice) } : null;
 }
 
+// Called once at app launch. A streak only survives if the user answered
+// yesterday or today; otherwise it has lapsed since the last time stats were
+// touched (e.g. they skipped 2+ days) and current_streak must drop to 0 even
+// though no answer has come in yet to trigger that naturally. longest_streak
+// is a record and is never touched here.
+export async function resetExpiredStreak(userId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('user_stats')
+    .select('current_streak, last_answered_date')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to check streak expiry:', error.message);
+    return;
+  }
+  if (!data || data.current_streak === 0) return;
+
+  const today = toLocalISODate(new Date());
+  const yesterday = toLocalISODate(new Date(Date.now() - 86_400_000));
+  const isStillAlive = data.last_answered_date === today || data.last_answered_date === yesterday;
+  if (isStillAlive) return;
+
+  const { error: updateError } = await supabase
+    .from('user_stats')
+    .update({ current_streak: 0 })
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('Failed to reset expired streak:', updateError.message);
+  }
+}
+
+// Bonus awarded the instant `current_streak` reaches (not passes) one of
+// these values. Intentionally not persisted as "milestone already claimed"
+// anywhere — the equality check below against the freshly computed streak is
+// the only source of truth, so a milestone re-fires every time the streak
+// climbs back up to it after a reset.
+const STREAK_MILESTONE_BONUSES: Record<number, number> = {
+  7: 50,
+  30: 200,
+  180: 750,
+  365: 2000,
+};
+
 async function updateUserStatsAfterAnswer(userId: string, pointsEarned: number) {
   const { data: existing, error: fetchError } = await supabase
     .from('user_stats')
@@ -157,6 +230,7 @@ async function updateUserStatsAfterAnswer(userId: string, pointsEarned: number) 
 
   const today = toLocalISODate(new Date());
   const yesterday = toLocalISODate(new Date(Date.now() - 86_400_000));
+  const previousStreak = existing?.current_streak ?? 0;
 
   let currentStreak: number;
   if (existing?.last_answered_date === today) {
@@ -169,8 +243,13 @@ async function updateUserStatsAfterAnswer(userId: string, pointsEarned: number) 
     currentStreak = 1;
   }
 
+  // Only an actual increment can land on a milestone — the "already answered
+  // today" branch above leaves currentStreak === previousStreak, so it never
+  // re-awards a bonus for a streak the user already got credit for.
+  const streakBonus = currentStreak > previousStreak ? (STREAK_MILESTONE_BONUSES[currentStreak] ?? 0) : 0;
+
   const longestStreak = Math.max(existing?.longest_streak ?? 0, currentStreak);
-  const totalPoints = (existing?.total_points ?? 0) + pointsEarned;
+  const totalPoints = (existing?.total_points ?? 0) + pointsEarned + streakBonus;
 
   const { error } = await supabase.from('user_stats').upsert(
     {
@@ -192,9 +271,10 @@ export async function submitAnswer(
   userId: string,
   questionId: string,
   selectedIndex: number,
-  isCorrect: boolean
+  isCorrect: boolean,
+  pointsValue: number
 ) {
-  const pointsEarned = isCorrect ? POINTS_PER_CORRECT_ANSWER : 0;
+  const pointsEarned = isCorrect ? pointsValue : 0;
 
   const { error } = await supabase.from('user_answers').insert({
     user_id: userId,
@@ -216,16 +296,20 @@ export async function submitAnswer(
 export async function getUserStats(userId: string): Promise<UserStats> {
   const { data, error } = await supabase
     .from('user_stats')
-    .select('current_streak, total_points')
+    .select('current_streak, longest_streak, total_points')
     .eq('user_id', userId)
     .maybeSingle();
 
   if (error) {
     console.error('Failed to fetch user stats:', error.message);
-    return { streak: 0, score: 0 };
+    return { streak: 0, longestStreak: 0, score: 0 };
   }
 
-  return { streak: data?.current_streak ?? 0, score: data?.total_points ?? 0 };
+  return {
+    streak: data?.current_streak ?? 0,
+    longestStreak: data?.longest_streak ?? 0,
+    score: data?.total_points ?? 0,
+  };
 }
 
 // Rolling 7-day window (not calendar-week) — matches "the last 7 days" rather

@@ -104,3 +104,53 @@ export async function getRecapDay(userId: string): Promise<string | null> {
   await AsyncStorage.setItem(RECAP_DAY_CACHE_KEY, data.weekly_recap_day);
   return data.weekly_recap_day;
 }
+
+const CATEGORY_IDS_CACHE_KEY = 'iknow.preferredCategoryIds';
+
+async function cachePreferredCategoryIds(categoryIds: number[]) {
+  await AsyncStorage.setItem(CATEGORY_IDS_CACHE_KEY, JSON.stringify(categoryIds));
+}
+
+export async function getCachedPreferredCategoryIds(): Promise<number[] | null> {
+  const raw = await AsyncStorage.getItem(CATEGORY_IDS_CACHE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as number[];
+  } catch {
+    return null;
+  }
+}
+
+export async function savePreferredCategoryIds(userId: string, categoryIds: number[]) {
+  // Cache first: the question screen must still be able to filter offline.
+  await cachePreferredCategoryIds(categoryIds);
+
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert({ user_id: userId, preferred_category_ids: categoryIds }, { onConflict: 'user_id' });
+
+  if (error) {
+    console.error('Failed to sync preferred categories to Supabase (kept in local cache):', error.message);
+  }
+}
+
+// Returns [] when the user has no explicit preference (never touched the
+// setting, or offline with nothing cached) — callers treat that as "all
+// categories", not "no categories".
+export async function getPreferredCategoryIds(userId: string): Promise<number[]> {
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('preferred_category_ids')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error || !data?.preferred_category_ids?.length) {
+    if (error) {
+      console.error('Failed to fetch preferred categories from Supabase, falling back to cache:', error.message);
+    }
+    return (await getCachedPreferredCategoryIds()) ?? [];
+  }
+
+  await cachePreferredCategoryIds(data.preferred_category_ids);
+  return data.preferred_category_ids;
+}

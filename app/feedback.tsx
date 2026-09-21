@@ -40,7 +40,7 @@ export default function FeedbackScreen() {
         {isCorrect ? (
           <View style={styles.resultHeader}>
             <Text style={[styles.resultTitle, { color: DesignColors.success }]}>Bonne réponse !</Text>
-            <Text style={styles.resultSubtitle}>+10 points</Text>
+            <Text style={styles.resultSubtitle}>+{question.pointsValue} points</Text>
           </View>
         ) : (
           <View style={styles.resultHeader}>

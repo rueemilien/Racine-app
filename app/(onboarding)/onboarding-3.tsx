@@ -1,19 +1,44 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DesignColors, DesignFonts, inkAlpha } from '@/constants/design-system';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { Category, getCategories } from '@/src/services/daily';
 import { parseTimeLabel, scheduleDailyReminder } from '@/src/services/notifications';
 import { supabase } from '@/src/services/supabase';
-import { saveNotificationTime } from '@/src/services/user-settings';
+import { saveNotificationTime, savePreferredCategoryIds } from '@/src/services/user-settings';
 
 const TIME_OPTIONS = ['8h00', '12h00', '18h00', '20h00'];
+// Débutant is id 1 — preselected so the "at least one category" rule is
+// satisfied without the user having to touch anything on this screen.
+const DEFAULT_CATEGORY_IDS = [1];
 
 export default function OnboardingThreeScreen() {
   const router = useRouter();
   const { completeOnboarding } = useOnboarding();
   const [selectedTime, setSelectedTime] = useState(TIME_OPTIONS[0]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>(DEFAULT_CATEGORY_IDS);
+
+  useEffect(() => {
+    let isActive = true;
+    getCategories().then((cats) => {
+      if (isActive) setCategories(cats);
+    });
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  function handleToggleCategory(categoryId: number) {
+    setSelectedCategoryIds((prev) => {
+      const isSelected = prev.includes(categoryId);
+      // At least one category must stay selected.
+      if (isSelected && prev.length === 1) return prev;
+      return isSelected ? prev.filter((id) => id !== categoryId) : [...prev, categoryId];
+    });
+  }
 
   async function goToAccueil() {
     await completeOnboarding();
@@ -28,14 +53,23 @@ export default function OnboardingThreeScreen() {
     } = await supabase.auth.getSession();
     if (session?.user.id) {
       await saveNotificationTime(session.user.id, { hour, minute });
+      await savePreferredCategoryIds(session.user.id, selectedCategoryIds);
     }
 
     await scheduleDailyReminder(hour, minute);
     await goToAccueil();
   }
 
-  function handleSkip() {
-    goToAccueil();
+  async function handleSkip() {
+    // The category choice isn't tied to notifications — keep it even when
+    // the user skips setting a reminder time.
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.user.id) {
+      await savePreferredCategoryIds(session.user.id, selectedCategoryIds);
+    }
+    await goToAccueil();
   }
 
   return (
@@ -44,6 +78,28 @@ export default function OnboardingThreeScreen() {
         <View style={styles.copy}>
           <Text style={styles.title}>Personnalisez votre rituel</Text>
           <Text style={styles.paragraph}>Vous pourrez tout modifier plus tard dans Réglages.</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Catégories</Text>
+          <View style={styles.chipsRow}>
+            {categories.map((category) => {
+              const isSelected = selectedCategoryIds.includes(category.id);
+              return (
+                <Pressable
+                  key={category.id}
+                  onPress={() => handleToggleCategory(category.id)}
+                  style={[
+                    styles.chip,
+                    isSelected ? styles.chipSelected : styles.chipUnselected,
+                  ]}>
+                  <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                    {category.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
         <View style={styles.section}>
